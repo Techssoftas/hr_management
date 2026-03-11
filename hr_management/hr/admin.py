@@ -70,22 +70,22 @@ class DailySalaryAdmin(admin.ModelAdmin):
 
 @admin.register(AdvancePayment)
 class AdvanceAdmin(admin.ModelAdmin):
-    list_display = ('employee', 'amount', 'date_given', 'is_deducted')
-    list_filter = ('is_deducted', 'date_given')
+    list_display = ('employee', 'amount', 'date_given', 'is_active')
+    list_filter = ('is_active', 'date_given')
     search_fields = ('employee__name',)
 
 @admin.register(MonthlySalarySummary)
 class MonthlySummaryAdmin(admin.ModelAdmin):
     list_display = (
-        'employee', 'month_year', 'total_shifts_worked', 
+        'employee', 'date', 'total_shifts_worked', 
         'total_hours_worked', 'gross_salary', 'net_payable', 'status'
     )
-    list_filter = ('status', 'month_year')
+    list_filter = ('status', 'date')
     search_fields = ('employee__name', 'employee__employee_id')
     
     # These fields are auto-calculated by the model's save() method
     readonly_fields = (
-        'total_days_present', 'total_shifts_worked', 
+        'total_days', 'total_shifts_worked', 
         'total_hours_worked', 'gross_salary', 
         'advance_deducted', 'net_payable'
     )
@@ -94,14 +94,7 @@ class MonthlySummaryAdmin(admin.ModelAdmin):
 
     @admin.action(description="Mark selected summaries as Paid")
     def mark_as_paid(self, request, queryset):
-        with transaction.atomic():
-            queryset.update(status='PAID')
-            # Important: Mark the advances as deducted when salary is paid
-            for summary in queryset:
-                AdvancePayment.objects.filter(
-                    employee=summary.employee, 
-                    is_deducted=False
-                ).update(is_deducted=True)
+        queryset.update(status='PAID')
 
 # Simple registrations
 admin.site.register(Designation)

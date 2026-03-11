@@ -129,7 +129,7 @@ STATIC_URL = 'static/'
 # 1. Tells Django to use our CustomUser model for all logins (CRITICAL)
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
-# 2. Django REST Framework Configuration
+# 2. Django REST Framework Configuration 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,

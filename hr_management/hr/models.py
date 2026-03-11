@@ -2,8 +2,12 @@ from django.db import models
 import calendar
 from decimal import Decimal
 from .utils import *
-from django.db.models import Q
+from django.db.models import Q, Sum, F, Max,Min
 from datetime import date
+from calendar import monthrange
+from datetime import date as dt_date
+
+
 
 # 1. This is a "Base Class". It won't create a table itself, 
 # but it adds these 3 columns to every other table.
@@ -22,13 +26,7 @@ class Shift(BaseModel):
 
     class Meta:
         ordering = ["shift_value"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=['shift_value'],
-                condition=Q(is_active=True),
-                name='unique_active_shift_value',
-            ),
-        ]
+        constraints = [models.UniqueConstraint(fields=['shift_value'],condition=Q(is_active=True),name='unique_active_shift_value',),]
 
     def __str__(self):
         return f"{self.shift_value} ({self.standard_hours} hrs)"
@@ -41,12 +39,7 @@ class Designation(BaseModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=['name'],
-                condition=Q(is_active=True),
-                name='unique_active_designation_name',
-            ),
-        ]
+            models.UniqueConstraint(fields=['name'],condition=Q(is_active=True),name='unique_active_designation_name',),]
 
     def __str__(self):
         return f"{self.name} ({self.get_salary_type_display()})"
@@ -58,17 +51,36 @@ class Employee(BaseModel):
         Designation, on_delete=models.RESTRICT, related_name='employees'
     )
     date_of_joining = models.DateField()
-
     # Extra personal / HR info
     date_of_birth = models.DateField(null=True, blank=True)
     address = models.TextField(blank=True)
     district = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)  # NEW
+
+
+    GENDER_CHOICES = [
+        ('MALE', 'Male'),
+        ('FEMALE', 'Female'),
+        ('OTHER', 'Other'),
+    ]
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)  # NEW
     education_qualification = models.CharField(max_length=255, blank=True)
     end_date = models.DateField(null=True, blank=True)
 
     contact_number = models.CharField(max_length=15)
+    emergency_contact_number = models.CharField(max_length=15, blank=True)  # NEW
+    emergency_relation = models.CharField(max_length=50, blank=True)        # NEW
+    emergency_relation_name = models.CharField(max_length=150, blank=True)  # NEW
     blood_group = models.CharField(max_length=5, blank=True)
     has_esi_pf = models.BooleanField(default=False)
+    esi_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True, blank=True)   # e.g. monthly ESI deduction
+    pf_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True, blank=True)    # e.g. monthly PF deduction
+
+
+    bank_name = models.CharField(max_length=100, blank=True)         # NEW
+    bank_branch = models.CharField(max_length=100, blank=True)       # NEW
+    ifsc_code = models.CharField(max_length=20, blank=True)          # NEW
+    account_number = models.CharField(max_length=30, blank=True)     # NEW
 
     # Files with size validation
     # Media & Docs (Condensed)
@@ -80,15 +92,17 @@ class Employee(BaseModel):
     passbook_pdf = models.FileField(upload_to='employee_docs/passbook/', null=True, blank=True, validators=[validate_pdf_size])
     appointment_order = models.FileField(upload_to='employee_docs/appointment_orders/', null=True, blank=True, validators=[validate_pdf_size])
     experience = models.TextField(blank=True)
+    # After address, district, etc. in the Employee class:
+    about = models.TextField(blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    aadhaar_number = models.CharField(max_length=20, blank=True)   # Aadhaar is 12 digits, allow spaces/dashes
+    pan_number = models.CharField(max_length=20, blank=True)      # PAN is 10 chars
+    esi_account_number = models.CharField(max_length=50, blank=True)
+    pf_account_number = models.CharField(max_length=50, blank=True)
 
-    class Meta:
+    class Meta: 
         constraints = [
-            models.UniqueConstraint(
-                fields=['employee_id'],
-                condition=Q(is_active=True),
-                name='unique_active_employee_id',
-            ),
-        ]
+            models.UniqueConstraint(fields=['employee_id'],condition=Q(is_active=True),name='unique_active_employee_id',),]
 
     @property
     def age(self):
@@ -100,6 +114,7 @@ class Employee(BaseModel):
         if (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day):
             years -= 1
         return years
+    
     def save(self, *args, **kwargs):
         if not self.employee_id:
             last_emp = Employee.objects.all().order_by('id').last()
@@ -116,77 +131,82 @@ class Employee(BaseModel):
 class DailySalaryEntry(BaseModel):
     employee = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='daily_entries')
     date = models.DateField()
-    
+    day = models.PositiveIntegerField(default=1, help_text="Day (default 1)")
     # HR Input: Just numbers
     shift_value = models.DecimalField(max_digits=3, decimal_places=2, default=1.0, help_text="1.0, 0.5, 1.5, etc.")
     ot_hours = models.DecimalField(max_digits=4, decimal_places=1, default=0.0)
     worked_hours = models.DecimalField(max_digits=4, decimal_places=1, default=0, editable=False)  # add this
-    amount_earned = models.DecimalField(max_digits=8, decimal_places=2, editable=False)
+    total_hours = models.DecimalField(max_digits=4, decimal_places=1, default=0, editable=False)
+    amount_earned = models.DecimalField(max_digits=8, decimal_places=2, default=0, editable=False)
 
     class Meta:
         unique_together = ('employee', 'date')
 
-    
 
 
 
 
 
 
-class AdvancePayment(models.Model):
+
+
+class AdvancePayment(BaseModel):
     """Tracks money given in advance to be deducted from salary."""
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='advances')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date_given = models.DateField()
-    is_deducted = models.BooleanField(default=False)
+
 
     def __str__(self):
         return f"Advance ₹{self.amount} - {self.employee.name}"
-
-class MonthlySalarySummary(models.Model):
-    """Final Payroll: Summarizes Shifts, Hours, and Net Pay."""
-    STATUS_CHOICES = [('UNPAID', 'Unpaid'), ('PAID', 'Paid')]
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='monthly_summaries')
-    month_year = models.DateField(help_text="Select the 1st day of the month")
     
+
+
+
+class MonthlySalarySummary(BaseModel):
+    """
+    Final Payroll: Summarizes shifts, hours, advances and net pay
+    for one employee in one month.
+    - `date` will be set to the LAST worked date in that month
+      (e.g. 2026-03-03 if there are entries on 1,2,3).
+    - One row per (employee, month) is enforced by unique_together.
+    """
+    STATUS_CHOICES = [
+        ('UNPAID', 'Unpaid'),
+        ('PAID', 'Paid'),
+    ]
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name='monthly_summaries',)
+    # Will be updated to the last worked date for that month
+    date = models.DateField()
     # Summarized Data
-    total_days_present = models.IntegerField(default=0)
     total_shifts_worked = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
     total_hours_worked = models.DecimalField(max_digits=6, decimal_places=2, default=0.0)
-    
+    total_days = models.DecimalField(max_digits=3, decimal_places=2, default=0.0)
     # Financials
     gross_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     advance_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     net_payable = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    esi_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.0, null=True, blank=True)
+    pf_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.0, null=True, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='UNPAID')
-
     class Meta:
-        unique_together = ('employee', 'month_year')
-
-    def save(self, *args, **kwargs):
-        from django.db.models import Sum, F
-        entries = DailySalaryEntry.objects.filter(
-            employee=self.employee, 
-            date__month=self.month_year.month, 
-            date__year=self.month_year.year
-        )
-        if entries.exists():
-            stats = entries.aggregate(
-                s_shifts=Sum('shift_value'),
-                s_hours=Sum(F('worked_hours') + F('ot_hours')),
-                s_money=Sum('amount_earned')
-            )
-            self.total_days_present = entries.count()
-            self.total_shifts_worked = stats['s_shifts'] or 0.0
-            self.total_hours_worked = stats['s_hours'] or 0.0
-            self.gross_salary = stats['s_money'] or 0.0
-            
-            # Substract Advances
-            advances = AdvancePayment.objects.filter(employee=self.employee, is_deducted=False)
-            self.advance_deducted = advances.aggregate(Sum('amount'))['amount__sum'] or 0.0
-            self.net_payable = self.gross_salary - self.advance_deducted
-            
-        super().save(*args, **kwargs)
-
+        unique_together = ('employee', 'date')
+        ordering = ['-date', 'employee_id']
+    # No custom save: signals do all calculations.
     def __str__(self):
-        return f"{self.employee.name} - {self.month_year.strftime('%B %Y')}"
+        return f"{self.employee.employee_name} - {self.date.strftime('%d-%m-%Y')} - {self.get_status_display()}"
+    
+
+
+class Certificate(BaseModel):
+    """
+    Stores uploaded certificates as PDFs (max 2 MB).
+    """
+    name = models.CharField(max_length=255)
+    date  = models.DateField()  # the day the certificate is relevant/issued
+    file = models.ImageField(
+    upload_to='certificates/',
+    validators=[validate_photo_size_certificate],  # 500 KB validation from utils
+)
+    def __str__(self):
+        return f"{self.name} - {self.date}"    
