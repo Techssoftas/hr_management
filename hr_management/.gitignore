@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtualenv
+venv/
+.env/
+
+# Django
+*.sqlite3
+db.sqlite3
+*.log
+
+# Media uploads
+hr_management/media/
+
+# IDE/editor
+.vscode/
+.idea/
+*.code-workspace
+
+
+
+# Django media uploads
+media/
+*/media/
+hr_management/media/
