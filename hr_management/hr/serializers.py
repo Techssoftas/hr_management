@@ -104,12 +104,12 @@ class MonthlySalarySummarySerializer(serializers.ModelSerializer):
             'id', 'employee', 'employee_name', 'employee_id_display',
             'date', 'total_days', 'total_shifts_worked', 'total_hours_worked',
             'gross_salary', 'advance_deducted', 'net_payable',
-            'status',"esi_amount", "pf_amount",
+            'is_paid',"esi_amount", "pf_amount",
             'is_active', 'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'employee', 'date', 'total_days', 'total_shifts_worked',
-            'total_hours_worked', 'gross_salary', 'advance_deducted', 'net_payable',
+            'total_hours_worked',  'advance_deducted', 'net_payable',
             'is_active', 'created_at', 'updated_at',
         ]        
 

@@ -78,9 +78,9 @@ class AdvanceAdmin(admin.ModelAdmin):
 class MonthlySummaryAdmin(admin.ModelAdmin):
     list_display = (
         'employee', 'date', 'total_shifts_worked', 
-        'total_hours_worked', 'gross_salary', 'net_payable', 'status'
+        'total_hours_worked', 'gross_salary', 'net_payable', 'is_paid'
     )
-    list_filter = ('status', 'date')
+    list_filter = ('is_paid', 'date')
     search_fields = ('employee__name', 'employee__employee_id')
     
     # These fields are auto-calculated by the model's save() method
@@ -94,7 +94,7 @@ class MonthlySummaryAdmin(admin.ModelAdmin):
 
     @admin.action(description="Mark selected summaries as Paid")
     def mark_as_paid(self, request, queryset):
-        queryset.update(status='PAID')
+        queryset.update(is_paid=True)
 
 # Simple registrations
 admin.site.register(Designation)

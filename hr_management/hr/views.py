@@ -15,6 +15,15 @@ class ShiftViewSet(viewsets.ModelViewSet):
     serializer_class = ShiftSerializer
     queryset = Shift.objects.filter(is_active=True)
     permission_classes =[IsAuthenticated, IsHRorAdmin]
+
+
+    def get_queryset(self):
+        qs = Shift.objects.filter(is_active=True)
+        shift_value = self.request.query_params.get('shift_value')
+        if shift_value is not None:
+            qs = qs.filter(shift_value=shift_value)
+        return qs
+    
     def destroy(self, request, *args, **kwargs):
         """Soft delete: set is_active=False instead of removing the record."""
         instance = self.get_object()
@@ -62,14 +71,18 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return EmployeeSerializer
 
     def destroy(self, request, *args, **kwargs):
-        """Soft delete: set is_active=False instead of removing the record."""
+        """Soft delete employee and cascade to daily entries, monthly summaries, and advances."""
         instance = self.get_object()
-        instance.is_active = False
-        instance.save()
+        with transaction.atomic():
+            instance.is_active = False
+            instance.save()
+            DailySalaryEntry.objects.filter(employee=instance).update(is_active=False)
+            MonthlySalarySummary.objects.filter(employee=instance).update(is_active=False)
+            AdvancePayment.objects.filter(employee=instance).update(is_active=False)
         return Response(
-    {"detail": "Deleted successfully"},
-    status=status.HTTP_200_OK
-)
+            {"detail": "Deleted successfully"},
+            status=status.HTTP_200_OK
+        )
     
 
     @action(detail=False, methods=['get'], url_path='lists')
@@ -225,16 +238,25 @@ class MonthlySalarySummaryViewSet(viewsets.ModelViewSet):
         if date_to:
             qs = qs.filter(date__lte=date_to)
 
-        # Status filter: ?status=paid → PAID; no or anything else → UNPAID
-        status_param = (self.request.query_params.get('status') or '').strip().upper()
-        if status_param == 'PAID':
-            qs = qs.filter(status='PAID')
-        else:
-            qs = qs.filter(status='UNPAID')
+        # Replace the status_param block with:
+        is_paid_param = self.request.query_params.get('is_paid')
+        if is_paid_param is not None:
+            is_paid = str(is_paid_param).strip().lower() in ('true', '1', 'yes')
+            qs = qs.filter(is_paid=is_paid)
 
         # Latest first
         return qs.order_by('-date', 'employee__employee_id')
 
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        # Recalculate net_payable after any update
+        instance.net_payable = (
+            (instance.gross_salary or 0)
+            - (instance.advance_deducted or 0)
+            - (instance.esi_amount or 0)
+            - (instance.pf_amount or 0)
+        )
+        instance.save()
 
 
 class CertificateViewSet(viewsets.ModelViewSet):

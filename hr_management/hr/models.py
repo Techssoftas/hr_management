@@ -171,10 +171,10 @@ class MonthlySalarySummary(BaseModel):
       (e.g. 2026-03-03 if there are entries on 1,2,3).
     - One row per (employee, month) is enforced by unique_together.
     """
-    STATUS_CHOICES = [
-        ('UNPAID', 'Unpaid'),
-        ('PAID', 'Paid'),
-    ]
+    # STATUS_CHOICES = [
+    #     ('UNPAID', 'Unpaid'),
+    #     ('PAID', 'Paid'),
+    # ]
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name='monthly_summaries',)
     # Will be updated to the last worked date for that month
     date = models.DateField()
@@ -188,13 +188,14 @@ class MonthlySalarySummary(BaseModel):
     net_payable = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     esi_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.0, null=True, blank=True)
     pf_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.0, null=True, blank=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='UNPAID')
+    # status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='UNPAID')
+    is_paid = models.BooleanField(default=False)
     class Meta:
         unique_together = ('employee', 'date')
         ordering = ['-date', 'employee_id']
     # No custom save: signals do all calculations.
     def __str__(self):
-        return f"{self.employee.employee_name} - {self.date.strftime('%d-%m-%Y')} - {self.get_status_display()}"
+         return f"{self.employee.employee_name} - {self.date.strftime('%d-%m-%Y')} - {'Paid' if self.is_paid else 'Unpaid'}"
     
 
 

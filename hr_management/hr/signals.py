@@ -1,7 +1,7 @@
 from django.db.models import Sum, F, Min, Max
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from .models import DailySalaryEntry, MonthlySalarySummary, AdvancePayment
+from .models import DailySalaryEntry, MonthlySalarySummary, AdvancePayment, Employee
 
 
 def update_monthly_summary_for_entry(employee, year, month):
@@ -35,7 +35,7 @@ def update_monthly_summary_for_entry(employee, year, month):
         summary = MonthlySalarySummary(
             employee=employee,
             date=first_day,
-            status='UNPAID',
+             is_paid=False,  # or just rely on default
         )
 
     if entries.exists():
@@ -68,8 +68,9 @@ def update_monthly_summary_for_entry(employee, year, month):
         else:
             summary.advance_deducted = 0
         # Pull ESI/PF amounts from the employee into the monthly summary
-        summary.esi_amount = employee.esi_amount or 0
-        summary.pf_amount = employee.pf_amount or 0
+        if not summary.is_paid:
+            summary.esi_amount = employee.esi_amount or 0
+            summary.pf_amount = employee.pf_amount or 0
 
         # Net payable after advances + ESI + PF
         summary.net_payable = (
@@ -111,3 +112,26 @@ def on_daily_entry_delete(sender, instance, **kwargs):
         instance.date.year,
         instance.date.month,
     )
+
+
+@receiver(post_save, sender=Employee)
+def on_employee_save(sender, instance, **kwargs):
+    """
+    When an employee's ESI/PF amounts change, update all unpaid monthly
+    summaries for that employee to reflect the new amounts and recompute
+    net_payable.
+    """
+    unpaid_summaries = MonthlySalarySummary.objects.filter(
+        employee=instance,
+        is_paid=False,
+    )
+    for summary in unpaid_summaries:
+        summary.esi_amount = instance.esi_amount or 0
+        summary.pf_amount = instance.pf_amount or 0
+        summary.net_payable = (
+            (summary.gross_salary or 0)
+            - (summary.advance_deducted or 0)
+            - (summary.esi_amount or 0)
+            - (summary.pf_amount or 0)
+        )
+        summary.save()
