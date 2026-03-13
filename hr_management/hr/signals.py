@@ -2,6 +2,7 @@ from django.db.models import Sum, F, Min, Max
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from .models import DailySalaryEntry, MonthlySalarySummary, AdvancePayment, Employee
+from decimal import Decimal
 
 
 def update_monthly_summary_for_entry(employee, year, month):
@@ -57,10 +58,11 @@ def update_monthly_summary_for_entry(employee, year, month):
             # Set summary.date = LAST worked date (e.g. 3rd)
             summary.date = max_date
 
-            # Advances only between min_date and max_date
+            # Advances for the whole month up to the last worked date
+            first_day = date(year, month, 1)
             advances_sum = AdvancePayment.objects.filter(
                 employee=employee,
-                date_given__gte=min_date,
+                date_given__gte=first_day,
                 date_given__lte=max_date,
                 is_active=True,
             ).aggregate(Sum('amount'))['amount__sum'] or 0
@@ -72,13 +74,9 @@ def update_monthly_summary_for_entry(employee, year, month):
             summary.esi_amount = employee.esi_amount or 0
             summary.pf_amount = employee.pf_amount or 0
 
-        # Net payable after advances + ESI + PF
-        summary.net_payable = (
-            summary.gross_salary
-            - summary.advance_deducted
-            - (summary.esi_amount or 0)
-            - (summary.pf_amount or 0)
-        )
+        # Net payable after advances only (no ESI/PF deduction) and never negative
+        raw_net = (summary.gross_salary or 0) - (summary.advance_deducted or 0)
+        summary.net_payable = max(Decimal("0"), raw_net)
     else:
         # No entries in that month: zero out fields
         summary.total_days = 0
@@ -128,10 +126,7 @@ def on_employee_save(sender, instance, **kwargs):
     for summary in unpaid_summaries:
         summary.esi_amount = instance.esi_amount or 0
         summary.pf_amount = instance.pf_amount or 0
-        summary.net_payable = (
-            (summary.gross_salary or 0)
-            - (summary.advance_deducted or 0)
-            - (summary.esi_amount or 0)
-            - (summary.pf_amount or 0)
-        )
+        # Net payable after advances only (no ESI/PF deduction) and never negative
+        raw_net = (summary.gross_salary or 0) - (summary.advance_deducted or 0)
+        summary.net_payable = max(Decimal("0"), raw_net)
         summary.save()

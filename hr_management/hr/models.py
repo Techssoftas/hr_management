@@ -190,9 +190,16 @@ class MonthlySalarySummary(BaseModel):
     pf_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.0, null=True, blank=True)
     # status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='UNPAID')
     is_paid = models.BooleanField(default=False)
+
     class Meta:
         unique_together = ('employee', 'date')
         ordering = ['-date', 'employee_id']
+        constraints = [
+            models.CheckConstraint(
+                check=Q(net_payable__gte=0),
+                name='net_payable_non_negative',
+            ),
+        ]
     # No custom save: signals do all calculations.
     def __str__(self):
          return f"{self.employee.employee_name} - {self.date.strftime('%d-%m-%Y')} - {'Paid' if self.is_paid else 'Unpaid'}"

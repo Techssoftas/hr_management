@@ -64,11 +64,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
 class AdvancePaymentSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.employee_name', read_only=True)
     employee_id_display = serializers.CharField(source='employee.employee_id', read_only=True)
+    designation_name = serializers.CharField(source='employee.designation.name', read_only=True)
 
     class Meta:
         model = AdvancePayment
         fields = [
-            'id', 'employee', 'employee_name', 'employee_id_display',
+            'id', 'employee', 'employee_name', 'employee_id_display', 'designation_name',
             'amount', 'date_given',
             'is_active', 'created_at', 'updated_at'
         ]
@@ -97,19 +98,24 @@ class DailySalaryEntrySerializer(serializers.ModelSerializer):
 class MonthlySalarySummarySerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.employee_name', read_only=True)
     employee_id_display = serializers.CharField(source='employee.employee_id', read_only=True)
-
+    designation_base_salary = serializers.DecimalField(
+        source='employee.designation.base_salary',
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+    )
     class Meta:
         model = MonthlySalarySummary
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_display',
             'date', 'total_days', 'total_shifts_worked', 'total_hours_worked',
             'gross_salary', 'advance_deducted', 'net_payable',
-            'is_paid',"esi_amount", "pf_amount",
+            'is_paid',"esi_amount", "pf_amount",'designation_base_salary', 
             'is_active', 'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'employee', 'date', 'total_days', 'total_shifts_worked',
-            'total_hours_worked',  'advance_deducted', 'net_payable',
+            'total_hours_worked',  'advance_deducted',
             'is_active', 'created_at', 'updated_at',
         ]        
 

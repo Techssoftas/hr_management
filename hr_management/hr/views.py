@@ -8,6 +8,7 @@ from .permissions import IsHRorAdmin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from django.db import transaction
+from decimal import Decimal
 
 
 # Create your views here.
@@ -92,7 +93,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         designation name, contact number. Paginated like normal list.
         URL: /hr/employees/lists/
         """
-        qs = self.get_queryset().select_related('designation')
+        qs = self.get_queryset().select_related('designation').order_by('-employee_id')
         page = self.paginate_queryset(qs)
         if page is not None:
             data = [
@@ -127,11 +128,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
 class AdvancePaymentViewSet(viewsets.ModelViewSet):
     serializer_class = AdvancePaymentSerializer
-    queryset = AdvancePayment.objects.filter(is_active=True).select_related('employee')
+    queryset = AdvancePayment.objects.filter(is_active=True).select_related('employee', 'employee__designation')
     permission_classes = [IsAuthenticated, IsHRorAdmin]
 
     def get_queryset(self):
-        qs = AdvancePayment.objects.filter(is_active=True).select_related('employee')
+        qs = AdvancePayment.objects.filter(is_active=True).select_related('employee', 'employee__designation')
         employee_id = self.request.query_params.get('employee_id')
         if employee_id:
             qs = qs.filter(employee_id=employee_id)
@@ -249,13 +250,13 @@ class MonthlySalarySummaryViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        # Recalculate net_payable after any update
-        instance.net_payable = (
-            (instance.gross_salary or 0)
-            - (instance.advance_deducted or 0)
-            - (instance.esi_amount or 0)
-            - (instance.pf_amount or 0)
-        )
+        # If client provided net_payable, just clamp it to be non-negative.
+        # Otherwise (no net_payable in payload), recompute from gross - advance.
+        if 'net_payable' in serializer.validated_data:
+            instance.net_payable = max(Decimal("0"), instance.net_payable or 0)
+        else:
+            raw_net = (instance.gross_salary or 0) - (instance.advance_deducted or 0)
+            instance.net_payable = max(Decimal("0"), raw_net)
         instance.save()
 
 
