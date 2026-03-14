@@ -5,8 +5,8 @@ class ShiftSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shift
         fields = [
-            'id', 'shift_value', 'standard_hours', 
-            'is_active', 'created_at', 'updated_at'
+            'id', 'shift_value', 'standard_hours'
+           
         ]
         read_only_fields = ['created_at', 'updated_at']
 
@@ -15,7 +15,7 @@ class DesignationSerializer(serializers.ModelSerializer):
         model = Designation
         fields = [
             'id', 'name', 'salary_type', 'base_salary', 
-            'is_active', 'created_at', 'updated_at'
+           
         ]
         read_only_fields = ['is_active', 'created_at', 'updated_at']
 
@@ -53,7 +53,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'bank_name', 'bank_branch', 'ifsc_code', 'account_number',
             'about', 'country', 'aadhaar_number', 'pan_number', 'esi_account_number', 'pf_account_number',
             'has_esi_pf', 'esi_amount', 'pf_amount','is_active', 'photo', 'aadhaar_pdf', 'pan_pdf',
-            'passbook_pdf', 'appointment_order', 'created_at', 'updated_at'
+            'passbook_pdf', 'appointment_order', 
         ]
         read_only_fields = [
             'employee_id', 'is_active', 'created_at', 'updated_at',
@@ -71,7 +71,7 @@ class AdvancePaymentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_display', 'designation_name',
             'amount', 'date_given',
-            'is_active', 'created_at', 'updated_at'
+          
         ]
         read_only_fields = ['created_at', 'updated_at']
 
@@ -90,7 +90,7 @@ class DailySalaryEntrySerializer(serializers.ModelSerializer):
             'id', 'employee', 'employee_name', 'employee_id_display',
             'day', 'date', 'shift_value', 'ot_hours',
             'worked_hours', 'total_hours', 'amount_earned',
-            'is_active', 'created_at', 'updated_at'
+           
         ]
         read_only_fields = ['created_at', 'updated_at', 'day']
 
@@ -111,7 +111,7 @@ class MonthlySalarySummarySerializer(serializers.ModelSerializer):
             'date', 'total_days', 'total_shifts_worked', 'total_hours_worked',
             'gross_salary', 'advance_deducted', 'net_payable',
             'is_paid',"esi_amount", "pf_amount",'designation_base_salary', 
-            'is_active', 'created_at', 'updated_at',
+           
         ]
         read_only_fields = [
             'id', 'employee', 'date', 'total_days', 'total_shifts_worked',
@@ -124,5 +124,5 @@ class MonthlySalarySummarySerializer(serializers.ModelSerializer):
 class CertificateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Certificate
-        fields = ['id', 'name', 'date', 'file', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'date', 'file','is_active']
         read_only_fields = ['created_at', 'updated_at']

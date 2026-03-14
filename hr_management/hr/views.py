@@ -136,7 +136,7 @@ class AdvancePaymentViewSet(viewsets.ModelViewSet):
         employee_id = self.request.query_params.get('employee_id')
         if employee_id:
             qs = qs.filter(employee_id=employee_id)
-        return qs
+        return qs.order_by('-date_given', '-created_at')
 
     def destroy(self, request, *args, **kwargs):
         """Soft delete: set is_active=False."""
