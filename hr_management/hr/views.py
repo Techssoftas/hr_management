@@ -264,6 +264,9 @@ class CertificateViewSet(viewsets.ModelViewSet):
     serializer_class = CertificateSerializer
     queryset = Certificate.objects.filter(is_active=True)
     permission_classes = [IsAuthenticated, IsHRorAdmin]
+    pagination_class = None  # Return all results without pagination for certificates
+
+
     def get_queryset(self):
         qs = Certificate.objects.filter(is_active=True)
         name = self.request.query_params.get('name')
