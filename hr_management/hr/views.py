@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError, APIException
+from rest_framework.exceptions import ValidationError as DRFValidationError, APIException
 from .models import Shift
 from .serializers import *
 from .permissions import IsHRorAdmin
@@ -59,10 +59,24 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsHRorAdmin]
 
     def get_queryset(self):
+        """
+        Base /hr/employees/ endpoint:
+        - Supports only employee_id filter (exact).
+        - All other filters are available on /hr/employees/lists/.
+        """
         qs = Employee.objects.filter(is_active=True).select_related('designation')
+
         employee_id = self.request.query_params.get('employee_id')
         if employee_id:
-            qs = qs.filter(employee_id__iexact=employee_id.strip())
+            employee_id = employee_id.strip()
+            # If an employee_id is supplied but doesn't exist (even inactive),
+            # return a clear 400 instead of an empty list.
+            if not Employee.objects.filter(employee_id__iexact=employee_id).exists():
+                raise DRFValidationError(
+                    {"employee_id": f"No employee found with id '{employee_id}'."}
+                )
+            qs = qs.filter(employee_id__iexact=employee_id)
+
         return qs
 
     def get_serializer_class(self):
@@ -93,7 +107,46 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         designation name, contact number. Paginated like normal list.
         URL: /hr/employees/lists/
         """
-        qs = self.get_queryset().select_related('designation').order_by('-employee_id')
+        params = self.request.query_params
+        qs = Employee.objects.filter(is_active=True).select_related('designation')
+
+        # Apply all supported filters here
+        employee_id = params.get('employee_id')
+        if employee_id:
+            qs = qs.filter(employee_id__iexact=employee_id.strip())
+
+        employee_name = params.get('employee_name')
+        if employee_name:
+            qs = qs.filter(employee_name__iexact=employee_name.strip())
+
+        designation_id = params.get('designation_id')
+        if designation_id:
+            if not Designation.objects.filter(pk=designation_id, is_active=True).exists():
+                raise DRFValidationError(
+                    {"designation_id": f"No active designation found with id '{designation_id}'."}
+                )
+            qs = qs.filter(designation_id=designation_id)
+
+        joining_date = params.get('joining_date')
+        if joining_date:
+            from datetime import datetime
+            try:
+                datetime.strptime(joining_date, "%Y-%m-%d")
+            except ValueError:
+                raise DRFValidationError(
+                    {"joining_date": "joining_date must be in YYYY-MM-DD format."}
+                )
+            qs = qs.filter(date_of_joining=joining_date)
+
+        district = params.get('district')
+        if district:
+            qs = qs.filter(district__icontains=district.strip())
+
+        contact_number = params.get('contact_number')
+        if contact_number:
+            qs = qs.filter(contact_number__icontains=contact_number.strip())
+
+        qs = qs.order_by('-employee_id')
         page = self.paginate_queryset(qs)
         if page is not None:
             data = [
@@ -186,7 +239,7 @@ class DailySalaryEntryViewSet(viewsets.ModelViewSet):
                 serializer.save()
         except Exception as exc:
             # Let explicit DRF validation errors bubble through unchanged
-            if isinstance(exc, ValidationError):
+            if isinstance(exc, DRFValidationError):
                 raise
             raise APIException("Could not create daily salary entry.") from exc
 
@@ -199,7 +252,7 @@ class DailySalaryEntryViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 serializer.save()
         except Exception as exc:
-            if isinstance(exc, ValidationError):
+            if isinstance(exc, DRFValidationError):
                 raise
             raise APIException("Could not update daily salary entry.") from exc
 

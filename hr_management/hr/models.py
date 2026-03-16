@@ -156,6 +156,17 @@ class AdvancePayment(BaseModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date_given = models.DateField()
 
+    class Meta:
+        # For each active employee, allow only one advance record per date.
+        # If they need to change, they should edit the existing record.
+        constraints = [
+            models.UniqueConstraint(
+                fields=['employee', 'date_given'],
+                condition=Q(is_active=True),
+                name='unique_active_advance_per_employee_per_day',
+            ),
+        ]
+
 
     def __str__(self):
         return f"Advance ₹{self.amount} - {self.employee.name}"
@@ -213,7 +224,7 @@ class Certificate(BaseModel):
     name = models.CharField(max_length=255)
     date  = models.DateField()  # the day the certificate is relevant/issued
     file = models.ImageField(
-    upload_to='certificates/',
+    upload_to='certificates/' ,
     validators=[validate_photo_size_certificate],  # 500 KB validation from utils
 )
     def __str__(self):

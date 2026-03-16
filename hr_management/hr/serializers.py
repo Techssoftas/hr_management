@@ -71,9 +71,37 @@ class AdvancePaymentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_display', 'designation_name',
             'amount', 'date_given',
-          
         ]
         read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, attrs):
+        """
+        Enforce: one active advance per employee per date.
+        If another record exists for the same employee & date_given, raise
+        a clear 400 error telling the user to edit the existing advance.
+        """
+        employee = attrs.get('employee') or getattr(self.instance, 'employee', None)
+        date_given = attrs.get('date_given') or getattr(self.instance, 'date_given', None)
+
+        if employee and date_given:
+            qs = AdvancePayment.objects.filter(
+                is_active=True,
+                employee=employee,
+                date_given=date_given,
+            )
+            # Exclude self when updating an existing record
+            if self.instance is not None:
+                qs = qs.exclude(pk=self.instance.pk)
+
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {
+                        "detail": "An advance for this employee on this date already exists. "
+                                  "Please edit the existing record instead of creating another."
+                    }
+                )
+
+        return attrs
 
 
 
