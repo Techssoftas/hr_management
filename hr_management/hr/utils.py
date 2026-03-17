@@ -11,7 +11,7 @@ def validate_photo_size(file):
 
 def validate_photo_size_certificate(file):
     if file and file.size > MAX_PHOTO_SIZE:
-        raise ValidationError("Photo size must be at most 300 KB.")
+        raise ValidationError("Photo size must be at most 500 KB.")
 
 def validate_pdf_size(file):
     if file and file.size > MAX_PDF_SIZE:

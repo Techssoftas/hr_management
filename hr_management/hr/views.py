@@ -213,6 +213,10 @@ class DailySalaryEntryViewSet(viewsets.ModelViewSet):
         if employee_id:
             qs = qs.filter(employee__employee_id__iexact=employee_id.strip())
 
+        employee_name = self.request.query_params.get('employee_name')
+        if employee_name:
+            qs = qs.filter(employee__employee_name__icontains=employee_name.strip())
+
         # Filter by designation (id)
         designation_id = self.request.query_params.get('designation_id')
         if designation_id:
@@ -278,6 +282,12 @@ class MonthlySalarySummaryViewSet(viewsets.ModelViewSet):
         if employee_id:
             qs = qs.filter(employee__employee_id__iexact=employee_id.strip())
 
+
+        employee_name = self.request.query_params.get('employee_name')
+        if employee_name:
+            qs = qs.filter(employee__employee_name__icontains=employee_name.strip())
+
+            
         # Filter by designation (id)
         designation_id = self.request.query_params.get('designation_id')
         if designation_id:

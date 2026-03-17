@@ -111,11 +111,13 @@ class DailySalaryEntrySerializer(serializers.ModelSerializer):
     worked_hours = serializers.DecimalField(max_digits=4, decimal_places=1, required=False, default=0)
     amount_earned = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=0)
     total_hours = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default=0)
-
+    designation_id = serializers.IntegerField(source='employee.designation_id', read_only=True)
+    designation_name = serializers.CharField(source='employee.designation.name', read_only=True)
     class Meta:
         model = DailySalaryEntry
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_display',
+             'designation_id', 'designation_name',
             'day', 'date', 'shift_value', 'ot_hours',
             'worked_hours', 'total_hours', 'amount_earned',
            
@@ -126,6 +128,8 @@ class DailySalaryEntrySerializer(serializers.ModelSerializer):
 class MonthlySalarySummarySerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.employee_name', read_only=True)
     employee_id_display = serializers.CharField(source='employee.employee_id', read_only=True)
+    designation_id = serializers.IntegerField(source='employee.designation_id', read_only=True)
+    designation_name = serializers.CharField(source='employee.designation.name', read_only=True)
     designation_base_salary = serializers.DecimalField(
         source='employee.designation.base_salary',
         max_digits=10,
@@ -136,6 +140,7 @@ class MonthlySalarySummarySerializer(serializers.ModelSerializer):
         model = MonthlySalarySummary
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_display',
+             'designation_id', 'designation_name',
             'date', 'total_days', 'total_shifts_worked', 'total_hours_worked',
             'gross_salary', 'advance_deducted', 'net_payable',
             'is_paid',"esi_amount", "pf_amount",'designation_base_salary', 
