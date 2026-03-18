@@ -140,7 +140,13 @@ class DailySalaryEntry(BaseModel):
     amount_earned = models.DecimalField(max_digits=8, decimal_places=2, default=0, editable=False)
 
     class Meta:
-        unique_together = ('employee', 'date')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['employee', 'date'],
+                condition=Q(is_active=True),
+                name='unique_active_daily_entry_per_employee_per_day',
+            ),
+        ]
 
 
 
