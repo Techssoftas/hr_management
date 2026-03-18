@@ -1,7 +1,7 @@
-from django.db.models import Sum, F, Min, Max
+from django.db.models import Sum, F, Min, Max, Q
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
-from .models import DailySalaryEntry, MonthlySalarySummary, AdvancePayment, Employee
+from .models import DailySalaryEntry, MonthlySalarySummary, AdvancePayment, Employee, Bonus
 from decimal import Decimal
 
 
@@ -48,10 +48,22 @@ def update_monthly_summary_for_entry(employee, year, month):
             s_hours=Sum(F('worked_hours') + F('ot_hours')),
             s_money=Sum('amount_earned'),
         )
+
+        # --- NEW BONUS LOGIC ---
+        bonus_total = Bonus.objects.filter(
+            employee=employee,
+            date_given__year=year,
+            date_given__month=month,
+            is_active=True
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal("0")
+        # -----------------------
+
         summary.total_days = entries.count()
         summary.total_shifts_worked = stats['s_shifts'] or 0
         summary.total_hours_worked = stats['s_hours'] or 0
-        summary.gross_salary = stats['s_money'] or 0
+        
+        # Updated to include bonus in gross calculation
+        summary.gross_salary = (stats['s_money'] or 0) + bonus_total
 
         # Range of worked dates in this month
         date_range = entries.aggregate(min_date=Min('date'), max_date=Max('date'))
@@ -84,11 +96,19 @@ def update_monthly_summary_for_entry(employee, year, month):
             raw_net = (summary.gross_salary or 0) - (summary.advance_deducted or 0)
             summary.net_payable = max(Decimal("0"), raw_net)
     else:
+        # No entries in that month: check for bonuses anyway
+        bonus_total = Bonus.objects.filter(
+            employee=employee,
+            date_given__year=year,
+            date_given__month=month,
+            is_active=True
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal("0")
+
         # No entries in that month: zero out fields
         summary.total_days = 0
         summary.total_shifts_worked = 0
         summary.total_hours_worked = 0
-        summary.gross_salary = 0
+        summary.gross_salary = bonus_total # Gross is the bonus if no work entries
         # Do not touch advance_deducted or net_payable here, because
         # they may already reflect prior advances and manual adjustments.
         summary.esi_amount = 0
@@ -256,3 +276,23 @@ def on_employee_save(sender, instance, **kwargs):
         raw_net = (summary.gross_salary or 0) - (summary.advance_deducted or 0)
         summary.net_payable = max(Decimal("0"), raw_net)
         summary.save()
+
+# --- NEW SIGNALS FOR BONUS ---
+
+@receiver(post_save, sender=Bonus)
+def on_bonus_save(sender, instance, created, **kwargs):
+    """When a bonus is added or updated, refresh the monthly summary."""
+    update_monthly_summary_for_entry(
+        instance.employee,
+        instance.date_given.year,
+        instance.date_given.month,
+    )
+
+@receiver(post_delete, sender=Bonus)
+def on_bonus_delete(sender, instance, **kwargs):
+    """When a bonus is deleted, refresh the monthly summary."""
+    update_monthly_summary_for_entry(
+        instance.employee,
+        instance.date_given.year,
+        instance.date_given.month,
+    )

@@ -355,3 +355,32 @@ class CertificateViewSet(viewsets.ModelViewSet):
         instance.save()
         return Response({"detail": "Deleted successfully"}, status=status.HTTP_200_OK)
 
+
+
+
+class BonusViewSet(viewsets.ModelViewSet):
+    serializer_class = BonusSerializer
+    queryset = Bonus.objects.filter(is_active=True).select_related('employee', 'employee__designation')
+    permission_classes = [IsAuthenticated, IsHRorAdmin]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        employee_id = self.request.query_params.get('employee_id')
+        if employee_id:
+            # Filter by the internal ID or the string employee_id (K001)
+            qs = qs.filter(Q(employee_id=employee_id) | Q(employee__employee_id__iexact=employee_id))
+        
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        if date_from:
+            qs = qs.filter(date_given__gte=date_from)
+        if date_to:
+            qs = qs.filter(date_given__lte=date_to)
+            
+        return qs.order_by('-date_given', '-created_at')
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_active = False
+        instance.save()
+        return Response({"detail": "Bonus record deactivated successfully"}, status=status.HTTP_200_OK)

@@ -113,13 +113,16 @@ class DailySalaryEntrySerializer(serializers.ModelSerializer):
     total_hours = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default=0)
     designation_id = serializers.IntegerField(source='employee.designation_id', read_only=True)
     designation_name = serializers.CharField(source='employee.designation.name', read_only=True)
+    salary_type = serializers.CharField(source='employee.designation.salary_type', read_only=True)
+    base_salary = serializers.DecimalField(source='employee.designation.base_salary', max_digits=10, decimal_places=2, read_only=True)
+
     class Meta:
         model = DailySalaryEntry
         fields = [
             'id', 'employee', 'employee_name', 'employee_id_display',
-             'designation_id', 'designation_name',
+             'designation_id', 'designation_name','salary_type',
             'day', 'date', 'shift_value', 'ot_hours',
-            'worked_hours', 'total_hours', 'amount_earned',
+            'worked_hours', 'total_hours', 'amount_earned','base_salary',
            
         ]
         read_only_fields = ['created_at', 'updated_at', 'day']
@@ -159,3 +162,38 @@ class CertificateSerializer(serializers.ModelSerializer):
         model = Certificate
         fields = ['id', 'name', 'date', 'file','is_active']
         read_only_fields = ['created_at', 'updated_at']
+
+
+
+
+class BonusSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.employee_name', read_only=True)
+    employee_id_display = serializers.CharField(source='employee.employee_id', read_only=True)
+    designation_name = serializers.CharField(source='employee.designation.name', read_only=True)
+
+    class Meta:
+        model = Bonus
+        fields = [
+            'id', 'employee', 'employee_name', 'employee_id_display', 
+            'designation_name', 'amount', 'date_given', 'is_active'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, attrs):
+        employee = attrs.get('employee') or getattr(self.instance, 'employee', None)
+        date_given = attrs.get('date_given') or getattr(self.instance, 'date_given', None)
+
+        if employee and date_given:
+            qs = Bonus.objects.filter(
+                is_active=True,
+                employee=employee,
+                date_given=date_given,
+            )
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+
+            if qs.exists():
+                raise serializers.ValidationError({
+                    "detail": "A bonus for this employee on this date already exists."
+                })
+        return attrs

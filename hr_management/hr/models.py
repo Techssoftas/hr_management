@@ -229,9 +229,37 @@ class Certificate(BaseModel):
     """
     name = models.CharField(max_length=255)
     date  = models.DateField()  # the day the certificate is relevant/issued
-    file = models.ImageField(
-    upload_to='certificates/' ,
-    validators=[validate_photo_size_certificate],  # 500 KB validation from utils
-)
+    file = models.ImageField(upload_to='certificates/' ,
+validators=[validate_photo_size_certificate],)  # 500 KB validation from utils
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['name', 'date'],
+                condition=Q(is_active=True),
+                name='unique_active_certificate_per_date'
+            ),
+        ]
+
+
     def __str__(self):
         return f"{self.name} - {self.date}"    
+    
+
+
+class Bonus(BaseModel):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='bonuses')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    date_given = models.DateField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['employee', 'date_given'],
+                condition=Q(is_active=True),
+                name='unique_active_bonus_per_employee_per_day',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Bonus ₹{self.amount} - {self.employee.employee_name}"    

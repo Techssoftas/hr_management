@@ -10,6 +10,7 @@ router.register(r'advances', AdvancePaymentViewSet, basename='advance')
 router.register(r'daily-salary-entries', DailySalaryEntryViewSet, basename='daily-salary-entry')
 router.register(r'monthly-summaries', MonthlySalarySummaryViewSet, basename='monthly-summary')
 router.register(r'certificates', CertificateViewSet, basename='certificate')
+router.register(r'bonuses', BonusViewSet) # Register the Bonus API
 
 urlpatterns = [
     path('', include(router.urls)),
